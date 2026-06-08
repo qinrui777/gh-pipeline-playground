@@ -1,0 +1,53 @@
+name: Matrix Docker Build Simulation
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build image for ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+            tag: x64
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            tag: arm64
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+      - name: Show runner arch
+        run: uname -m
+      - name: Simulate build and save image
+        run: |
+          mkdir -p out
+          echo "Simulated image for ${{ matrix.arch }}" > out/image-${{ matrix.tag }}.txt
+          tar -czf image-${{ matrix.tag }}.tar -C out image-${{ matrix.tag }}.txt
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-${{ matrix.tag }}
+          path: image-${{ matrix.tag }}.tar
+
+  push:
+    name: Push images (simulated)
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: List downloaded artifacts
+        run: ls -la artifacts || true
+      - name: Simulate docker load & push
+        run: |
+          for f in artifacts/*.tar; do
+            echo "Found artifact: $f"
+            echo "Simulating docker load and push for $f"
+            # docker load -i "$f"
+            # docker tag ... && docker push ...
+          done
+

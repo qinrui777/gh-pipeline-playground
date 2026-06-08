@@ -1,0 +1,74 @@
+name: Matrix Docker Build and Push
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Whether to push built images to the registry'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      image-name:
+        description: 'Image name, without registry prefix (e.g. qinrui/myorg)'
+        required: true
+        default: 'qinrui/myorg'
+      registry:
+        description: 'Registry host (default docker.io)'
+        required: false
+        default: 'docker.io'
+
+jobs:
+  build:
+    name: Build and push image for ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+            platform: linux/amd64
+            dockerfile: myorg/deploy/docker/Dockerfile.cpu
+            tag: latest-cpu
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            dockerfile: myorg/deploy/docker/Dockerfile.aarch64
+            tag: latest-aarch64
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Show runner environment
+        run: |
+          echo "arch=${{ matrix.arch }}"
+          echo "platform=${{ matrix.platform }}"
+          uname -m
+
+      - name: Log in to container registry
+        if: ${{ github.event.inputs.publish == 'true' }}
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ github.event.inputs.registry }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Build and optionally push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platform }}
+          push: ${{ github.event.inputs.publish }}
+          tags: ${{ github.event.inputs.registry }}/${{ github.event.inputs.image-name }}:${{ matrix.tag }}
+          cache-from: type=registry,ref=${{ github.event.inputs.registry }}/${{ github.event.inputs.image-name }}:${{ matrix.tag }}
+          cache-to: type=inline
+
+      - name: Inspect built image metadata
+        if: ${{ github.event.inputs.publish != 'true' }}
+        run: |
+          echo "Built image tag: ${{ github.event.inputs.registry }}/${{ github.event.inputs.image-name }}:${{ matrix.tag }}"
+          docker buildx imagetools inspect ${{ github.event.inputs.registry }}/${{ github.event.inputs.image-name }}:${{ matrix.tag }} || true
+
