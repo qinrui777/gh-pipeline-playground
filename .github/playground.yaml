@@ -25,6 +25,7 @@ jobs:
       - name: Touch a file
         run: |
           echo "This is a playground workflow for testing GitHub Actions." > playground.txt
+          sleep 300
 
   Second-Job:
     runs-on: ubuntu-latest
