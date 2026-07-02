@@ -1,0 +1,36 @@
+name: A playground workflow
+
+# Description: This workflow builds and publishes Docker images for myorg on both aarch64 and x86_64 platforms.
+# With Standard GitHub-hosted runners
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  First-Job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check and Debug
+        run: |
+          df -h
+          hostnamectl
+          uname -a
+          whoami
+          echo "Checking arch......"
+          uname -m
+      - name: Touch a file
+        run: |
+          echo "This is a playground workflow for testing GitHub Actions." > playground.txt
+          sleep 300
+
+  Second-Job:
+    runs-on: ubuntu-latest
+    needs: First-Job
+    steps:
+      - name: Check the file from First-Job
+        run: |
+          cat playground.txt || echo "File not found. This is expected since jobs do not share files by default."
